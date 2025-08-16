@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Analysis Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the page */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+        /* Custom animation for the recording pulse */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+            }
+            70% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
+            }
+        }
+        .recording {
+            animation: pulse 2s infinite;
+        }
+        /* Custom gradient text */
+        .gradient-text {
+            background: -webkit-linear-gradient(45deg, #4f46e5, #c026d3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <!-- Page Header -->
+    <header class="bg-white shadow-lg p-4 w-full z-10 border-b-2 border-indigo-500 sticky top-0">
+        <h1 class="text-xl sm:text-3xl font-bold text-slate-800 text-center tracking-wider uppercase gradient-text">PROJECT VENUS : EMOTIONAL LAG DETECTOR THROUGH SPEECH</h1>
+    </header>
+
+    <div class="flex flex-col lg:flex-row">
+        
+        <!-- Sidebar for Recording Controls -->
+        <aside class="w-full lg:w-1/3 xl:w-1/4 bg-white p-6 shadow-2xl flex flex-col items-center justify-center space-y-6 border-r border-slate-200 lg:sticky lg:top-[85px] lg:h-[calc(100vh-85px)]">
+            <h2 class="text-3xl font-bold text-slate-900 text-center">Audio Analyzer</h2>
+            <p class="text-slate-600 text-center max-w-xs">Click the microphone to start recording and get real-time feedback on your speech.</p>
+            
+            <!-- Recording Button and Status -->
+            <div class="flex flex-col items-center space-y-4">
+                <button id="recordButton" class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full w-28 h-28 flex items-center justify-center shadow-lg hover:from-indigo-600 hover:to-purple-700 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-indigo-300 transform hover:scale-105">
+                    <svg id="micIcon" xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm5 10.586V16a1 1 0 11-2 0v-1.414A5 5 0 014 10V8a1 1 0 012 0v2a3 3 0 006 0V8a1 1 0 012 0v2a5 5 0 01-5 4.586z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <p id="statusText" class="text-slate-500 font-medium text-lg">Click to Record</p>
+            </div>
+
+            <!-- Audio Visualizer -->
+            <div class="w-full h-24 bg-slate-200 rounded-lg overflow-hidden border border-slate-300">
+                <canvas id="visualizer" class="w-full h-full"></canvas>
+            </div>
+            
+            <div id="messageBox" class="hidden w-full p-4 mt-4 text-sm text-indigo-700 bg-indigo-100 rounded-lg border border-indigo-200" role="alert">
+                <span class="font-medium">Info:</span> This is a demo. Analysis is simulated with sample data.
+            </div>
+        </aside>
+
+        <!-- Main Content for Analysis Display -->
+        <main class="w-full lg:w-2/3 xl:w-3/4 p-6 sm:p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                <!-- Thought Lag Detector Card -->
+                <div class="group h-96 [perspective:1000px]">
+                    <div class="relative h-full w-full rounded-xl shadow-lg transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                        <!-- Front Side -->
+                        <div class="absolute inset-0 bg-white p-6 rounded-xl [backface-visibility:hidden]">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-800">Thought Lag Detector</h2>
+                            <div id="lag-loader" class="flex justify-center items-center h-full hidden">
+                                <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </div>
+                            <div id="lag-content">
+                                <p class="text-slate-600 mb-4">Measures pauses and response times.</p>
+                                <div class="chart-container">
+                                    <canvas id="lagChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Back Side -->
+                        <div class="absolute inset-0 h-full w-full rounded-xl bg-gradient-to-br from-indigo-600 to-slate-800 text-white p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+                            <h3 class="text-2xl font-bold mb-4">What is Thought Lag?</h3>
+                            <p class="text-indigo-100">This measures the duration of pauses and hesitations in speech. It helps identify moments where the speaker might be searching for words or formulating thoughts, which can be linked to cognitive load or emotional state.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pitch Detector Card -->
+                <div class="group h-96 [perspective:1000px]">
+                    <div class="relative h-full w-full rounded-xl shadow-lg transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                        <!-- Front Side -->
+                        <div class="absolute inset-0 bg-white p-6 rounded-xl [backface-visibility:hidden]">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-800">Pitch Detector</h2>
+                             <div id="pitch-loader" class="flex justify-center items-center h-full hidden">
+                                <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </div>
+                            <div id="pitch-content">
+                                <p class="text-slate-600 mb-4">Analyzes the frequency variation in your voice.</p>
+                                <div class="chart-container">
+                                    <canvas id="pitchChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Back Side -->
+                        <div class="absolute inset-0 h-full w-full rounded-xl bg-gradient-to-br from-purple-600 to-slate-800 text-white p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+                            <h3 class="text-2xl font-bold mb-4">What is Pitch Detection?</h3>
+                            <p class="text-purple-100">This analyzes the fundamental frequency (F0) of the voice. Variations in pitch create vocal intonation. High variability can indicate excitement, while a monotone pitch might suggest sadness or disinterest.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emotion Detection Card -->
+                <div class="group h-96 [perspective:1000px]">
+                    <div class="relative h-full w-full rounded-xl shadow-lg transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                        <!-- Front Side -->
+                        <div class="absolute inset-0 bg-white p-6 rounded-xl [backface-visibility:hidden]">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-800">Emotion Detection</h2>
+                             <div id="emotion-loader" class="flex justify-center items-center h-full hidden">
+                                <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </div>
+                            <div id="emotion-content">
+                                <p class="text-slate-600 mb-4">Identifies emotional tone from vocal cues.</p>
+                                <div class="chart-container">
+                                    <canvas id="emotionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Back Side -->
+                        <div class="absolute inset-0 h-full w-full rounded-xl bg-gradient-to-br from-pink-600 to-slate-800 text-white p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+                            <h3 class="text-2xl font-bold mb-4">What is Emotion Detection?</h3>
+                            <p class="text-pink-100">This uses acoustic features like pitch, energy, and speech rate to classify the underlying emotional tone. Common detected emotions include happiness, sadness, anger, and neutrality.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filler Words Detection Card -->
+                <div class="group h-96 [perspective:1000px]">
+                    <div class="relative h-full w-full rounded-xl shadow-lg transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                        <!-- Front Side -->
+                        <div class="absolute inset-0 bg-white p-6 rounded-xl [backface-visibility:hidden]">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-800">Filler Word Detection</h2>
+                             <div id="filler-loader" class="flex justify-center items-center h-full hidden">
+                                <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            </div>
+                            <div id="filler-content">
+                                <p class="text-slate-600 mb-4">Counts instances of words like 'um', 'ah', 'like'.</p>
+                                <div id="filler-results" class="text-center mt-8">
+                                    <p class="text-slate-500">No data yet. Record audio to see results.</p>
+                                </div>
+                            </div>
+                        </div>
+                         <!-- Back Side -->
+                        <div class="absolute inset-0 h-full w-full rounded-xl bg-gradient-to-br from-teal-600 to-slate-800 text-white p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+                            <h3 class="text-2xl font-bold mb-4">What are Filler Words?</h3>
+                            <p class="text-teal-100">These are sounds or words used to fill pauses, such as 'um,' 'ah,' and 'like.' Frequent use can indicate nervousness, uncertainty, or a lack of preparation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Element References ---
+            const recordButton = document.getElementById('recordButton');
+            const statusText = document.getElementById('statusText');
+            const micIcon = document.getElementById('micIcon');
+            const messageBox = document.getElementById('messageBox');
+            
+            // --- Chart and Loader References ---
+            const loaders = {
+                lag: document.getElementById('lag-loader'),
+                pitch: document.getElementById('pitch-loader'),
+                emotion: document.getElementById('emotion-loader'),
+                filler: document.getElementById('filler-loader'),
+            };
+            const contents = {
+                lag: document.getElementById('lag-content'),
+                pitch: document.getElementById('pitch-content'),
+                emotion: document.getElementById('emotion-content'),
+                filler: document.getElementById('filler-content'),
+            };
+
+            // --- State Variables ---
+            let isRecording = false;
+            let mediaRecorder;
+            let audioChunks = [];
+            let audioContext;
+            let analyser;
+            let visualizerCanvas = document.getElementById('visualizer');
+            let visualizerCtx = visualizerCanvas.getContext('2d');
+            let animationFrameId;
+
+            // --- Chart Instances ---
+            let charts = {};
+
+            // --- Functions ---
+
+            /**
+             * Initializes a chart with default settings.
+             */
+            function createChart(chartId, type, data, options) {
+                const ctx = document.getElementById(chartId).getContext('2d');
+                if (charts[chartId]) {
+                    charts[chartId].destroy();
+                }
+                charts[chartId] = new Chart(ctx, { type, data, options });
+            }
+            
+            /**
+             * Initializes all charts with empty/default data.
+             */
+            function initializeCharts() {
+                const defaultOptions = {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, grid: { color: '#e2e8f0' } }, x: { grid: { color: '#e2e8f0' } } },
+                    plugins: { legend: { display: false } }
+                };
+                
+                createChart('lagChart', 'bar', {
+                    labels: ['Pause 1', 'Pause 2', 'Pause 3', 'Pause 4', 'Pause 5'],
+                    datasets: [{ 
+                        label: 'Pause Duration (s)', 
+                        data: [0, 0, 0, 0, 0], 
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                }, defaultOptions);
+
+                createChart('pitchChart', 'line', {
+                    labels: Array.from({ length: 10 }, (_, i) => `T${i}`),
+                    datasets: [{ 
+                        label: 'Pitch (Hz)', 
+                        data: [], 
+                        borderColor: 'rgba(192, 38, 211, 1)', 
+                        backgroundColor: 'rgba(192, 38, 211, 0.1)',
+                        fill: true,
+                        tension: 0.4 
+                    }]
+                }, defaultOptions);
+
+                createChart('emotionChart', 'doughnut', {
+                    labels: ['Neutral', 'Happy', 'Sad', 'Angry'],
+                    datasets: [{ 
+                        label: 'Emotion', 
+                        data: [100, 0, 0, 0], 
+                        backgroundColor: ['#94a3b8', '#4ade80', '#60a5fa', '#f87171'],
+                        borderColor: '#fff',
+                        borderWidth: 4
+                    }]
+                }, { responsive: true, maintainAspectRatio: false });
+            }
+
+            /**
+             * Toggles the visibility of loaders and content for all cards.
+             */
+            function toggleLoadingState(showLoader) {
+                for (const key in loaders) {
+                    loaders[key].classList.toggle('hidden', !showLoader);
+                    contents[key].classList.toggle('hidden', showLoader);
+                }
+            }
+            
+            /**
+             * Simulates sending audio to a backend and receiving analysis.
+             */
+            function processAudio() {
+                toggleLoadingState(true);
+                statusText.textContent = 'Analyzing...';
+                
+                setTimeout(() => {
+                    const mockData = generateMockData();
+                    updateUIWithData(mockData);
+                    toggleLoadingState(false);
+                    statusText.textContent = 'Analysis Complete!';
+                    messageBox.classList.remove('hidden');
+                }, 2500);
+            }
+            
+            /**
+             * Generates random, plausible data for demonstration.
+             */
+            function generateMockData() {
+                return {
+                    lag: {
+                        pauses: Array.from({ length: 5 }, () => (Math.random() * 2 + 0.2).toFixed(2))
+                    },
+                    pitch: {
+                        values: Array.from({ length: 10 }, () => Math.floor(Math.random() * 150) + 80)
+                    },
+                    emotion: {
+                        scores: {
+                            neutral: (Math.random() * 0.6 + 0.2).toFixed(2),
+                            happy: (Math.random() * 0.3).toFixed(2),
+                            sad: (Math.random() * 0.1).toFixed(2),
+                            angry: (Math.random() * 0.1).toFixed(2),
+                        }
+                    },
+                    fillerWords: {
+                        um: Math.floor(Math.random() * 5),
+                        ah: Math.floor(Math.random() * 4),
+                        like: Math.floor(Math.random() * 8),
+                        you_know: Math.floor(Math.random() * 3),
+                    }
+                };
+            }
+
+            /**
+             * Updates all charts and text displays with new data.
+             */
+            function updateUIWithData(data) {
+                charts.lagChart.data.datasets[0].data = data.lag.pauses;
+                charts.lagChart.update();
+
+                charts.pitchChart.data.datasets[0].data = data.pitch.values;
+                charts.pitchChart.update();
+
+                charts.emotionChart.data.datasets[0].data = Object.values(data.emotion.scores);
+                charts.emotionChart.update();
+                
+                const fillerResults = document.getElementById('filler-results');
+                fillerResults.innerHTML = '';
+                const fillerGrid = document.createElement('div');
+                fillerGrid.className = 'grid grid-cols-2 gap-4';
+                Object.entries(data.fillerWords).forEach(([word, count]) => {
+                    const wordDiv = document.createElement('div');
+                    wordDiv.className = 'bg-slate-100 p-3 rounded-lg border border-slate-200';
+                    wordDiv.innerHTML = `<p class="text-2xl font-bold text-indigo-600">${count}</p><p class="text-sm text-slate-600 capitalize">${word.replace('_', ' ')}</p>`;
+                    fillerGrid.appendChild(wordDiv);
+                });
+                fillerResults.appendChild(fillerGrid);
+            }
+
+            /**
+             * Starts the audio recording process.
+             */
+            async function startRecording() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    isRecording = true;
+                    recordButton.classList.add('recording');
+                    recordButton.classList.remove('bg-gradient-to-br', 'from-indigo-500', 'to-purple-600');
+                    recordButton.classList.add('bg-red-600');
+                    statusText.textContent = 'Recording...';
+                    micIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>`;
+                    
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        processAudio();
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    mediaRecorder.start();
+                    visualize(stream);
+                } catch (err) {
+                    console.error("Error accessing microphone:", err);
+                    statusText.textContent = 'Mic access denied.';
+                }
+            }
+
+            /**
+             * Stops the audio recording.
+             */
+            function stopRecording() {
+                isRecording = false;
+                mediaRecorder.stop();
+                recordButton.classList.remove('recording', 'bg-red-600');
+                recordButton.classList.add('bg-gradient-to-br', 'from-indigo-500', 'to-purple-600');
+                micIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm5 10.586V16a1 1 0 11-2 0v-1.414A5 5 0 014 10V8a1 1 0 012 0v2a3 3 0 006 0V8a1 1 0 012 0v2a5 5 0 01-5 4.586z" clip-rule="evenodd" /></svg>`;
+                cancelAnimationFrame(animationFrameId);
+                visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            }
+            
+            /**
+             * Draws the audio waveform on the canvas.
+             */
+            function visualize(stream) {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                source.connect(analyser);
+
+                const draw = () => {
+                    animationFrameId = requestAnimationFrame(draw);
+                    analyser.getByteTimeDomainData(dataArray);
+                    visualizerCtx.fillStyle = '#e2e8f0'; // bg-slate-200
+                    visualizerCtx.fillRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+                    visualizerCtx.lineWidth = 2;
+                    visualizerCtx.strokeStyle = '#6366f1'; // indigo-500
+                    visualizerCtx.beginPath();
+                    const sliceWidth = visualizerCanvas.width * 1.0 / bufferLength;
+                    let x = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        const v = dataArray[i] / 128.0;
+                        const y = v * visualizerCanvas.height / 2;
+                        if (i === 0) visualizerCtx.moveTo(x, y);
+                        else visualizerCtx.lineTo(x, y);
+                        x += sliceWidth;
+                    }
+                    visualizerCtx.lineTo(visualizerCanvas.width, visualizerCanvas.height / 2);
+                    visualizerCtx.stroke();
+                };
+                draw();
+            }
+
+            // --- Event Listeners ---
+            recordButton.addEventListener('click', () => {
+                if (isRecording) stopRecording();
+                else startRecording();
+            });
+
+            // --- Initial Setup ---
+            initializeCharts();
+            toggleLoadingState(false);
+        });
+    </script>
+</body>
+</html>
